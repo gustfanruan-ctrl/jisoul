@@ -1,0 +1,40 @@
+# 文件路径：docker-compose.yml
+# 用途：一键启动开发环境
+# MVP 范围：backend + frontend，Chroma 内嵌在 backend 中（非独立服务）
+
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: jisoul-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./backend/data:/app/data
+      - ./backend/models:/app/models
+    environment:
+      - DEFAULT_LLM_API_KEY=${LLM_API_KEY:-}
+      - DEBUG=true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: jisoul-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend/src:/app/src
+    depends_on:
+      - backend
+    restart: unless-stopped

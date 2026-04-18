@@ -1,0 +1,31 @@
+# 文件路径：backend/requirements.txt
+# 用途：Python 后端依赖清单
+# MVP 范围：只列 MVP 必需的包
+# 变更：改用 sentence-transformers 替代 FlagEmbedding，升级 torch 版本
+
+# Web 框架
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# 数据模型
+pydantic==2.10.4
+pydantic-settings==2.7.1
+
+# LLM 调用（OpenAI 兼容协议，支持 DeepSeek/智谱/Moonshot）
+openai==1.59.3
+httpx==0.28.1
+
+# 向量数据库
+chromadb==0.6.3
+
+# Embedding 模型（改用 sentence-transformers）
+sentence-transformers>=3.0.0
+torch>=2.6.0
+
+# 文档解析
+python-docx==1.1.2
+
+# 工具
+loguru==0.7.3
+uuid6==2024.7.10
