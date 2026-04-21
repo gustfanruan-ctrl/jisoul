@@ -29,9 +29,11 @@ import {
   ArrowLeftOutlined,
   FileTextOutlined,
 } from '@ant-design/icons'
-import type { UploadProps, ColumnsType } from 'antd'
+import type { UploadProps } from 'antd'
+import type { ColumnsType } from 'antd/es/table'
 import {
   uploadDocument,
+  importKnowledgeJson,
   fetchChunks,
   updateChunk,
   deleteChunk,
@@ -111,6 +113,44 @@ const KnowledgeAdminPage: React.FC<Props> = ({ onBack }) => {
         loadChunks()
       } catch (err: any) {
         message.error(`上传失败: ${err.message}`)
+      } finally {
+        setUploading(false)
+      }
+    },
+  }
+
+  const jsonUploadProps: UploadProps = {
+    accept: '.json',
+    showUploadList: false,
+    beforeUpload: () => false,
+    onChange: async (info) => {
+      const file = info.file as unknown as File
+      if (!file) return
+      setUploading(true)
+      try {
+        const raw = await file.text()
+        const parsed = JSON.parse(raw)
+        const items = Array.isArray(parsed) ? parsed : parsed?.items
+        if (!Array.isArray(items)) {
+          message.error('JSON 格式不正确：需为数组或 { items: [...] }')
+          return
+        }
+        const res = await importKnowledgeJson(items)
+        message.success(`导入完成：成功 ${res.imported}，失败 ${res.failed}`)
+        if (res.errors?.length) {
+          Modal.warning({
+            title: '部分条目导入失败',
+            content: (
+              <div style={{ maxHeight: 220, overflowY: 'auto', whiteSpace: 'pre-wrap' }}>
+                {res.errors.join('\n')}
+              </div>
+            ),
+          })
+        }
+        setPage(1)
+        loadChunks()
+      } catch (err: any) {
+        message.error(`JSON 导入失败: ${err.message}`)
       } finally {
         setUploading(false)
       }
@@ -321,8 +361,13 @@ const KnowledgeAdminPage: React.FC<Props> = ({ onBack }) => {
               上传文档
             </Button>
           </Upload>
+          <Upload {...jsonUploadProps}>
+            <Button icon={<UploadOutlined />} loading={uploading}>
+              上传 JSON 知识库
+            </Button>
+          </Upload>
           <Text type="secondary" style={{ fontSize: 12 }}>
-            支持 .txt .md .docx，单文件最大 10MB
+            支持 .txt .md .docx / .json，单文件最大 10MB
           </Text>
           {filterFileId && (
             <Button

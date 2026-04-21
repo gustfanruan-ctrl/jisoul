@@ -3,7 +3,7 @@
 // MVP 范围：整合所有组件，页面路由（知识库管理 vs 主页）
 
 import React, { useState } from 'react'
-import { Layout, Button, Typography, Space, Tag, Tooltip } from 'antd'
+import { Layout, Button, Typography, Space, Tag, Tooltip, message } from 'antd'
 import {
   SettingOutlined,
   DatabaseOutlined,
@@ -12,9 +12,12 @@ import {
 import TextInputPanel from './components/TextInputPanel'
 import SessionSummaryBar from './components/SessionSummaryBar'
 import FloatingAssistantPanel from './components/FloatingAssistantPanel'
+import TranscriptBubbleList from './components/TranscriptBubbleList'
+import RecordControl from './components/RecordControl'
 import ConfigDrawer from './components/ConfigDrawer'
 import KnowledgeAdminPage from './pages/KnowledgeAdminPage'
 import { useSessionStore } from './store'
+import { fetchSuggestions } from './services/api'
 
 const { Header, Content } = Layout
 const { Text } = Typography
@@ -23,7 +26,60 @@ const App: React.FC = () => {
   const [configOpen, setConfigOpen] = useState(false)
   const [page, setPage] = useState<'main' | 'knowledge'>('main')
 
-  const { industry, style } = useSessionStore()
+  const {
+    industry,
+    style,
+    llmConfig,
+    historyInputs,
+    sessionSummary,
+    bubbles,
+    suggestionTasks,
+    addHistoryInput,
+    setBubbleSelected,
+    setTaskLoading,
+    setTaskSuccess,
+    setTaskError,
+  } = useSessionStore()
+
+  const handleBubbleClick = async (bubbleId: string) => {
+    const bubble = bubbles.find((b) => b.id === bubbleId)
+    if (!bubble) return
+    if (bubble.type !== 'asr_final' && bubble.type !== 'manual') return
+
+    const loadingCount = Object.values(suggestionTasks).filter((t) => t.status === 'loading').length
+    const sameTaskLoading = suggestionTasks[bubbleId]?.status === 'loading'
+    if (!sameTaskLoading && loadingCount >= 3) {
+      message.warning('最多同时查询 3 条，请等待前序完成')
+      return
+    }
+
+    const title = `${bubble.text.slice(0, 15)}${bubble.text.length > 15 ? '…' : ''}`
+    setBubbleSelected(bubbleId, true)
+    setTaskLoading(bubbleId, title)
+    addHistoryInput(bubble.text)
+
+    try {
+      const selectedHistory = [...historyInputs, bubble.text].slice(-3)
+      const res = await fetchSuggestions({
+        input_text: bubble.text,
+        industry,
+        style,
+        history_inputs: selectedHistory,
+        session_summary: sessionSummary || undefined,
+        llm_base_url: llmConfig.base_url || undefined,
+        llm_api_key: llmConfig.api_key || undefined,
+        llm_model: llmConfig.model || undefined,
+      })
+      setTaskSuccess(bubbleId, {
+        suggestions: res.suggestions,
+        latencyMs: res.latency_ms,
+        fallback: res.fallback,
+        fallbackReason: res.fallback_reason,
+      })
+    } catch (err: any) {
+      setTaskError(bubbleId, title, err?.message || '请求失败，请重试')
+    }
+  }
 
   // ============ 知识库管理页面 ============
   if (page === 'knowledge') {
@@ -96,13 +152,12 @@ const App: React.FC = () => {
             height: 'calc(100vh - 56px - 48px)',
           }}
         >
-          {/* 左侧主区域 */}
+          {/* 左侧主区域：气泡流 + 录音 + 备用输入 */}
           <div
             style={{
               flex: 1,
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'flex-end',
               minWidth: 0,
             }}
           >
@@ -116,7 +171,13 @@ const App: React.FC = () => {
             >
               {/* 会议摘要栏（新增） */}
               <SessionSummaryBar />
-              <TextInputPanel />
+              <div style={{ height: 420 }}>
+                <TranscriptBubbleList onBubbleClick={handleBubbleClick} />
+              </div>
+              <RecordControl />
+              <div style={{ marginTop: 12 }}>
+                <TextInputPanel onSubmitBubble={handleBubbleClick} />
+              </div>
             </div>
           </div>
 

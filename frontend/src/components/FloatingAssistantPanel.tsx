@@ -2,8 +2,8 @@
 // 用途：右侧悬浮建议窗 - 话术卡片 + 复制按钮 + 状态展示
 // MVP 范围：US-004 全部验收标准
 
-import React, { useState } from 'react'
-import { Card, Button, Typography, Skeleton, Empty, Alert, Tag, Tooltip } from 'antd'
+import React, { useMemo, useState } from 'react'
+import { Card, Button, Typography, Skeleton, Empty, Alert, Tag, Tooltip, Tabs } from 'antd'
 import {
   CopyOutlined,
   CheckOutlined,
@@ -19,8 +19,25 @@ import type { Suggestion } from '../types'
 const { Text, Paragraph } = Typography
 
 const FloatingAssistantPanel: React.FC = () => {
-  const { suggestions, loading, error, fallback, fallbackReason, latencyMs, setError } =
-    useSessionStore()
+  const {
+    suggestionTasks,
+    activeTabBubbleId,
+    setActiveTabBubbleId,
+  } = useSessionStore()
+
+  const tabItems = useMemo(() => {
+    return Object.values(suggestionTasks).map((task) => {
+      const statusIcon = task.status === 'loading' ? '⏳' : task.status === 'success' ? '✅' : '❌'
+      const label = `${statusIcon} ${task.title}`
+      return {
+        key: task.bubbleId,
+        label,
+        children: <TaskContent task={task} />,
+      }
+    })
+  }, [suggestionTasks])
+
+  const currentKey = activeTabBubbleId || tabItems[0]?.key
 
   return (
     <div
@@ -43,72 +60,10 @@ const FloatingAssistantPanel: React.FC = () => {
           <BulbOutlined style={{ marginRight: 6 }} />
           建议话术
         </Text>
-        {latencyMs > 0 && (
-          <Tooltip title="端到端响应时间">
-            <Tag
-              icon={<ClockCircleOutlined />}
-              color={latencyMs <= 5000 ? 'green' : 'orange'}
-            >
-              {(latencyMs / 1000).toFixed(1)}s
-            </Tag>
-          </Tooltip>
-        )}
+        <Tag icon={<ClockCircleOutlined />} color="default">并发模式</Tag>
       </div>
 
-      {/* 降级提示 */}
-      {fallback && (
-        <Alert
-          type="warning"
-          showIcon
-          message={
-            fallbackReason === 'llm_timeout'
-              ? 'AI 响应超时，以下为知识库原文参考'
-              : fallbackReason === 'no_knowledge'
-                ? '未检索到相关知识'
-                : 'AI 生成异常，以下为备选建议'
-          }
-          style={{ fontSize: 12 }}
-          closable
-        />
-      )}
-
-      {/* 错误状态 */}
-      {error && (
-        <Alert
-          type="error"
-          showIcon
-          message="生成失败，请重试"
-          description={error}
-          action={
-            <Button size="small" icon={<ReloadOutlined />} onClick={() => setError(null)}>
-              关闭
-            </Button>
-          }
-        />
-      )}
-
-      {/* Loading 骨架屏 */}
-      {loading && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {[1, 2, 3].map((i) => (
-            <Card key={i} size="small" style={{ borderRadius: 8 }}>
-              <Skeleton active paragraph={{ rows: 2 }} title={false} />
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {/* 建议卡片列表 */}
-      {!loading && !error && suggestions.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1, overflowY: 'auto' }}>
-          {suggestions.map((sug, idx) => (
-            <SuggestionCard key={sug.id} suggestion={sug} index={idx} />
-          ))}
-        </div>
-      )}
-
-      {/* 空状态 */}
-      {!loading && !error && suggestions.length === 0 && (
+      {tabItems.length === 0 ? (
         <div
           style={{
             flex: 1,
@@ -119,10 +74,69 @@ const FloatingAssistantPanel: React.FC = () => {
         >
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="请输入客户话语获取建议"
+            description="点击左侧已定稿气泡生成建议"
           />
         </div>
+      ) : (
+        <Tabs
+          activeKey={currentKey}
+          onChange={(key) => setActiveTabBubbleId(key)}
+          items={tabItems}
+          size="small"
+        />
       )}
+    </div>
+  )
+}
+
+const TaskContent: React.FC<{ task: any }> = ({ task }) => {
+  if (task.status === 'loading') {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {[1, 2, 3].map((i) => (
+          <Card key={i} size="small" style={{ borderRadius: 8 }}>
+            <Skeleton active paragraph={{ rows: 2 }} title={false} />
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
+  if (task.status === 'error') {
+    return (
+      <Alert
+        type="error"
+        showIcon
+        message="生成失败，点击左侧气泡可重试"
+        description={task.error || '未知错误'}
+      />
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 520, overflowY: 'auto' }}>
+      {task.fallback && (
+        <Alert
+          type="warning"
+          showIcon
+          message={
+            task.fallbackReason === 'llm_timeout'
+              ? 'AI 响应超时，以下为知识库原文参考'
+              : task.fallbackReason === 'no_knowledge'
+                ? '未检索到相关知识'
+                : 'AI 生成异常，以下为备选建议'
+          }
+          style={{ fontSize: 12 }}
+        />
+      )}
+      <Tooltip title="端到端响应时间">
+        <Tag icon={<ClockCircleOutlined />} color={task.latencyMs <= 5000 ? 'green' : 'orange'}>
+          {(task.latencyMs / 1000).toFixed(1)}s
+        </Tag>
+      </Tooltip>
+      {task.suggestions.map((s: Suggestion, idx: number) => (
+        <SuggestionCard key={s.id} suggestion={s} index={idx} />
+      ))}
     </div>
   )
 }

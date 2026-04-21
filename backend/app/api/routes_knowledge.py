@@ -11,6 +11,7 @@ from loguru import logger
 
 from app.config import settings
 from app.knowledge.chunker import process_file
+from app.knowledge.eval_signal import append_kb_eval_signal
 from app.knowledge.store import vector_store
 from app.models.schemas import (
     UploadResponse,
@@ -102,6 +103,7 @@ async def upload_document(file: UploadFile = File(...)):
         logger.error(f"向量化存储失败: {e}")
         raise HTTPException(status_code=500, detail=f"向量化存储失败: {e}")
 
+    append_kb_eval_signal("chunks_added", source="upload", file_id=file_id, chunk_count=len(chunk_ids))
     logger.info(f"文件处理完成: {file_name} → {len(chunks)} 个切片")
 
     return UploadResponse(
@@ -180,6 +182,7 @@ async def update_chunk(chunk_id: str, req: ChunkUpdateRequest):
         logger.error(f"切片更新失败: {e}")
         raise HTTPException(status_code=500, detail=f"切片更新失败: {e}")
 
+    append_kb_eval_signal("chunk_updated", source="api", chunk_id=chunk_id)
     return ChunkUpdateResponse(chunk_id=chunk_id, status="completed")
 
 
@@ -191,6 +194,7 @@ async def delete_chunk(chunk_id: str):
         raise HTTPException(status_code=404, detail=f"切片不存在: {chunk_id}")
 
     vector_store.delete_chunks(ids=[chunk_id])
+    append_kb_eval_signal("chunk_deleted", source="api", chunk_id=chunk_id)
     return {"success": True}
 
 
@@ -207,6 +211,7 @@ async def delete_file(file_id: str):
         import shutil
         shutil.rmtree(file_dir, ignore_errors=True)
 
+    append_kb_eval_signal("file_deleted", source="api", file_id=file_id, deleted_chunks=count)
     return {"success": True, "deleted_chunks": count}
 
 
@@ -442,6 +447,7 @@ async def batch_import_knowledge(req: BatchImportRequest):
                     metadatas=batch_metadatas[start:end],
                 )
             logger.info(f"批量导入完成：{imported} 条写入向量库")
+            append_kb_eval_signal("chunks_added", source="batch_import", imported=imported)
         except Exception as e:
             logger.error(f"向量库批量写入失败: {e}")
             return BatchImportResponse(
