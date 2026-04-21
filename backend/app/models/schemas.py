@@ -3,7 +3,7 @@
 # MVP 范围：完整定义，与 PRD V1.0 + 已确认变更对齐
 
 from __future__ import annotations
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 from typing import Optional
 from enum import Enum
 import time
@@ -244,23 +244,7 @@ class KnowledgeBatchImportItem(BaseModel):
     fanruan_penetration: dict = Field(default_factory=dict)
     competitive_landscape: dict = Field(default_factory=dict)
     budget_cycle: dict = Field(default_factory=dict)
-
-    class Config:
-        # 允许额外字段传入（不会报错）
-        extra = "allow"
-
-    @model_validator(mode='before')
-    @classmethod
-    def normalize_product_card(cls, data):
-        """兼容 product_name → product，pain_points 数组 → 字符串"""
-        if isinstance(data, dict):
-            # product_name → product
-            if 'product_name' in data and not data.get('product'):
-                data['product'] = data.pop('product_name')
-            # pain_points 数组 → 字符串
-            if isinstance(data.get('pain_points'), list):
-                data['pain_points'] = '、'.join(data['pain_points'])
-        return data
+    
 
 
 class BatchImportRequest(BaseModel):

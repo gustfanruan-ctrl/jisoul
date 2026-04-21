@@ -44,6 +44,30 @@ export interface SuggestResponse {
   message?: string
 }
 
+export type BubbleType = 'asr_draft' | 'asr_final' | 'manual'
+
+export interface TranscriptBubble {
+  id: string
+  item_id?: string
+  text: string
+  stable_text?: string
+  stash_text?: string
+  type: BubbleType
+  created_at: number
+  selected?: boolean
+}
+
+export interface SuggestionTask {
+  bubbleId: string
+  title: string
+  status: 'loading' | 'success' | 'error'
+  suggestions: Suggestion[]
+  error: string | null
+  fallback: boolean
+  fallbackReason: string
+  latencyMs: number
+}
+
 // ============ 知识库 ============
 
 export interface KnowledgeChunk {
@@ -86,8 +110,26 @@ export interface LLMConfig {
   model: string
 }
 
+export interface ASRTokenResponse {
+  api_key: string
+  ws_url: string
+  model: string
+}
+
+export interface ASRConfig {
+  ws_url: string
+  api_key: string
+  model: string
+}
+
 export const DEFAULT_LLM_CONFIG: LLMConfig = {
   base_url: 'https://api.deepseek.com',
   api_key: '',
   model: 'deepseek-chat',
+}
+
+export const DEFAULT_ASR_CONFIG: ASRConfig = {
+  ws_url: 'wss://dashscope.aliyuncs.com/api-ws/v1/realtime',
+  api_key: '',
+  model: 'qwen3-asr-flash-realtime',
 }

@@ -26,7 +26,7 @@ import {
 } from '@ant-design/icons'
 import { useSessionStore } from '../store'
 import { INDUSTRIES, SPEECH_STYLES } from '../types'
-import type { Industry, SpeechStyle, LLMConfig } from '../types'
+import type { Industry, SpeechStyle, LLMConfig, ASRConfig } from '../types'
 
 const { Text } = Typography
 
@@ -36,10 +36,11 @@ interface Props {
 }
 
 const ConfigDrawer: React.FC<Props> = ({ open, onClose }) => {
-  const { industry, style, setIndustry, setStyle, llmConfig, setLLMConfig } =
+  const { industry, style, setIndustry, setStyle, llmConfig, setLLMConfig, asrConfig, setASRConfig } =
     useSessionStore()
 
   const [localLLM, setLocalLLM] = useState<LLMConfig>(llmConfig)
+  const [localASR, setLocalASR] = useState<ASRConfig>(asrConfig)
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<'success' | 'fail' | null>(null)
 
@@ -105,12 +106,18 @@ const ConfigDrawer: React.FC<Props> = ({ open, onClose }) => {
     message.success('LLM 配置已保存')
   }
 
+  const handleSaveASR = () => {
+    setASRConfig({ ...localASR })
+    message.success('ASR 配置已保存')
+  }
+
   React.useEffect(() => {
     if (open) {
       setLocalLLM(llmConfig)
+      setLocalASR(asrConfig)
       setTestResult(null)
     }
-  }, [open, llmConfig])
+  }, [open, llmConfig, asrConfig])
 
   return (
     <Drawer
@@ -250,6 +257,51 @@ const ConfigDrawer: React.FC<Props> = ({ open, onClose }) => {
                     保存配置
                   </Button>
                 </Space>
+              </div>
+            ),
+          },
+          {
+            key: 'asr',
+            label: (
+              <Text strong>
+                <ApiOutlined /> ASR 配置
+              </Text>
+            ),
+            children: (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div>
+                  <Text style={{ display: 'block', marginBottom: 4, fontSize: 13 }}>
+                    WebSocket URL
+                  </Text>
+                  <Input
+                    value={localASR.ws_url}
+                    onChange={(e) => setLocalASR({ ...localASR, ws_url: e.target.value })}
+                    placeholder="wss://dashscope.aliyuncs.com/api-ws/v1/realtime"
+                  />
+                </div>
+                <div>
+                  <Text style={{ display: 'block', marginBottom: 4, fontSize: 13 }}>
+                    ASR API Key
+                  </Text>
+                  <Input.Password
+                    value={localASR.api_key}
+                    onChange={(e) => setLocalASR({ ...localASR, api_key: e.target.value })}
+                    placeholder="sk-..."
+                  />
+                </div>
+                <div>
+                  <Text style={{ display: 'block', marginBottom: 4, fontSize: 13 }}>
+                    ASR 模型
+                  </Text>
+                  <Input
+                    value={localASR.model}
+                    onChange={(e) => setLocalASR({ ...localASR, model: e.target.value })}
+                    placeholder="qwen3-asr-flash-realtime"
+                  />
+                </div>
+                <Button type="primary" block onClick={handleSaveASR}>
+                  保存 ASR 配置
+                </Button>
               </div>
             ),
           },
